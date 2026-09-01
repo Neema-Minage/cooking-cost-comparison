@@ -10,10 +10,6 @@ Requires:
     tariff.py
     cct_lookup.csv
     parameters.csv
-
-The interface is a thin layer: every number comes from engine.py, which is
-unit-tested separately. Untested dish-appliance combinations are simply not
-offered, so coverage gaps cannot be selected in the first place.
 """
 
 import streamlit as st
@@ -22,9 +18,9 @@ from engine import MenuItem, Household, load_lookup, compare
 from tariff import load_params
 
 
-# ---------------------------------------------------------------------------
+# ============================================================================
 # PAGE CONFIGURATION
-# ---------------------------------------------------------------------------
+# ============================================================================
 
 st.set_page_config(
     page_title="Household Cooking Cost Comparison — Kenya",
@@ -34,32 +30,76 @@ st.set_page_config(
 )
 
 
-# ---------------------------------------------------------------------------
-# CUSTOM STYLING
-# ---------------------------------------------------------------------------
+# ============================================================================
+# CUSTOM CSS
+# ============================================================================
 
 st.markdown(
     """
     <style>
 
-    /* Main page spacing */
+    /* Page */
     .block-container {
         padding-top: 2rem;
         padding-bottom: 3rem;
     }
 
-    /* Main title */
+    /* Main headings */
     h1 {
         font-weight: 700;
         letter-spacing: -0.5px;
     }
 
-    /* Section headings */
     h2, h3 {
         margin-top: 1.2rem;
     }
 
-    /* Result cards */
+    /* ---------------------------------------------------------
+       THREE INPUT CARDS
+       --------------------------------------------------------- */
+
+    .choice-card {
+        border: 1px solid rgba(128, 128, 128, 0.25);
+        border-radius: 14px;
+        padding: 18px;
+        background: rgba(128, 128, 128, 0.035);
+        min-height: 105px;
+        margin-bottom: 12px;
+    }
+
+    .choice-card-meals {
+        border-top: 4px solid #d97706;
+    }
+
+    .choice-card-current {
+        border-top: 4px solid #dc2626;
+    }
+
+    .choice-card-considering {
+        border-top: 4px solid #2563eb;
+    }
+
+    .choice-card-title {
+        font-size: 1.15rem;
+        font-weight: 700;
+        margin-bottom: 4px;
+    }
+
+    .choice-card-description {
+        font-size: 0.85rem;
+        color: #777;
+        line-height: 1.35;
+    }
+
+    /* Make the columns equal height */
+    div[data-testid="stHorizontalBlock"] {
+        align-items: stretch;
+    }
+
+    /* ---------------------------------------------------------
+       RESULT CARDS
+       --------------------------------------------------------- */
+
     .result-card {
         border: 1px solid rgba(128, 128, 128, 0.25);
         border-radius: 14px;
@@ -97,7 +137,10 @@ st.markdown(
         margin-top: 5px;
     }
 
-    /* Big savings banner */
+    /* ---------------------------------------------------------
+       SAVINGS
+       --------------------------------------------------------- */
+
     .savings-banner {
         border-radius: 14px;
         padding: 20px 24px;
@@ -117,33 +160,10 @@ st.markdown(
         opacity: 0.75;
     }
 
-    /* Dish comparison cards */
-    .dish-card {
-        border: 1px solid rgba(128, 128, 128, 0.22);
-        border-radius: 12px;
-        padding: 14px 16px;
-        margin-bottom: 8px;
-        background: rgba(128, 128, 128, 0.025);
-    }
+    /* ---------------------------------------------------------
+       DESCRIPTION
+       --------------------------------------------------------- */
 
-    .dish-name {
-        font-weight: 700;
-        font-size: 1rem;
-    }
-
-    .dish-appliance {
-        font-size: 0.84rem;
-        opacity: 0.7;
-        margin-top: 3px;
-    }
-
-    .dish-saving {
-        font-weight: 700;
-        font-size: 0.9rem;
-        text-align: right;
-    }
-
-    /* Small explanatory text */
     .section-description {
         opacity: 0.68;
         font-size: 0.9rem;
@@ -151,55 +171,41 @@ st.markdown(
         margin-bottom: 15px;
     }
 
-    /* Divider */
-    .soft-divider {
-        margin: 25px 0;
-        border-top: 1px solid rgba(128, 128, 128, 0.18);
+    /* ---------------------------------------------------------
+       DISH ROW
+       --------------------------------------------------------- */
+
+    .dish-row {
+        border: 1px solid rgba(128, 128, 128, 0.18);
+        border-radius: 10px;
+        padding: 10px 12px;
+        margin-bottom: 8px;
+        background: rgba(128, 128, 128, 0.025);
     }
 
-    /* Sidebar */
+    /* ---------------------------------------------------------
+       SIDEBAR
+       --------------------------------------------------------- */
+
     section[data-testid="stSidebar"] {
         border-right: 1px solid rgba(128, 128, 128, 0.15);
     }
 
-/* Cooking-choice grid */
-.cooking-row {
-    padding: 4px 0;
-    margin-bottom: 2px;
-}
-
-/* Align labels and controls consistently */
-div[data-testid="stHorizontalBlock"] {
-    align-items: center;
-}
-
-/* Make selectboxes and number inputs visually consistent */
-div[data-testid="stSelectbox"],
-div[data-testid="stNumberInput"] {
-    margin-bottom: 0;
-}
-
-/* Header styling */
-.cooking-header {
-    font-weight: 700;
-    margin-bottom: 6px;
-}
-
-
     </style>
-    """
-    ,
+    """,
     unsafe_allow_html=True,
 )
 
 
-# ---------------------------------------------------------------------------
+# ============================================================================
 # DATA
-# ---------------------------------------------------------------------------
+# ============================================================================
 
 DISHES = [
     "Beans",
+    "Beef stew",
     "Rice",
+    "Ugali",
     "Spinach",
     "Chapati",
     "Chips",
@@ -207,65 +213,161 @@ DISHES = [
 
 DEFAULT_FREQ = {
     "Beans": 2,
+    "Beef stew": 2,
     "Rice": 3,
+    "Ugali": 3,
     "Spinach": 4,
     "Chapati": 1,
     "Chips": 1,
 }
 
 
+FREQUENCY_OPTIONS = [
+    "Not cooked",
+    "1 time/week",
+    "2 times/week",
+    "3 times/week",
+    "4 times/week",
+    "5 times/week",
+    "6 times/week",
+    "7 times/week",
+    "10 times/week",
+    "14 times/week",
+    "21 times/week",
+]
+
+
+FREQUENCY_VALUES = {
+    "Not cooked": 0,
+    "1 time/week": 1,
+    "2 times/week": 2,
+    "3 times/week": 3,
+    "4 times/week": 4,
+    "5 times/week": 5,
+    "6 times/week": 6,
+    "7 times/week": 7,
+    "10 times/week": 10,
+    "14 times/week": 14,
+    "21 times/week": 21,
+}
+
+
+# ============================================================================
+# LOAD DATA
+# ============================================================================
+
 @st.cache_data
-def data():
-    return load_lookup(), load_params()
+def load_data():
+    lookup_data = load_lookup()
+    params_data = load_params()
+    return lookup_data, params_data
 
 
-lookup, params = data()
+lookup, params = load_data()
 
 
-# ---------------------------------------------------------------------------
+# ============================================================================
 # HELPER FUNCTIONS
-# ---------------------------------------------------------------------------
+# ============================================================================
 
 def options_for(dish):
     """
-    Return only appliances with tested and usable energy data.
+    Return every appliance available for the selected dish.
+
+    The appliance is included when the lookup contains usable energy data.
     """
-    return sorted(
-        a
-        for (d, a), rec in lookup.items()
-        if d == dish and rec["energy_kwh"] is not None
-    )
+
+    appliances = []
+
+    for (d, appliance), record in lookup.items():
+
+        if d != dish:
+            continue
+
+        energy = record.get("energy_kwh")
+
+        if energy is None:
+            continue
+
+        appliances.append(appliance)
+
+    return sorted(set(appliances))
 
 
 def money(value):
-    """Format a value as Kenyan Shillings."""
+    """Format Kenyan Shillings."""
     return f"KSh {value:,.0f}"
 
 
-def signed_money(value):
-    """Format a signed monetary difference."""
-    if value < 0:
-        return f"-KSh {abs(value):,.0f}"
-    elif value > 0:
-        return f"+KSh {value:,.0f}"
-    return "KSh 0"
+def frequency_to_number(label):
+    """Convert frequency dropdown text into a numeric weekly frequency."""
+    return FREQUENCY_VALUES.get(label, 0)
 
 
-# ---------------------------------------------------------------------------
+def default_frequency_label(dish):
+    """Return the default frequency label for a dish."""
+
+    value = DEFAULT_FREQ.get(dish, 1)
+
+    if value == 1:
+        return "1 time/week"
+
+    return f"{value} times/week"
+
+
+def default_current_appliance(options):
+    """
+    Prefer LPG stove when available.
+    Otherwise use the first available appliance.
+    """
+
+    if "LPG stove" in options:
+        return "LPG stove"
+
+    return options[0] if options else None
+
+
+def default_proposed_appliance(options):
+    """
+    Prefer EPC, then induction cooker, then another available appliance.
+    """
+
+    preferred = [
+        "EPC",
+        "Induction cooker",
+        "Rice cooker",
+        "Air fryer",
+        "Infrared cooker",
+        "Hot plate",
+        "LPG stove",
+        "Improved charcoal stove (ICS)",
+        "Kerosene stove",
+        "Ethanol stove",
+    ]
+
+    for appliance in preferred:
+
+        if appliance in options:
+            return appliance
+
+    return options[0] if options else None
+
+
+# ============================================================================
 # HEADER
-# ---------------------------------------------------------------------------
+# ============================================================================
 
 st.title("🍲 Household Cooking Cost Comparison")
 
 st.caption(
-    "Compare the monthly cost, energy use, cooking time and payback of "
-    "different cooking appliances and fuels in Kenya."
+    "Compare monthly cooking costs, energy use, cooking time and appliance "
+    "payback for different cooking options in Kenya."
 )
 
 
-# ---------------------------------------------------------------------------
-# SIDEBAR — KEEPING YOUR ORIGINAL INPUT DESIGN
-# ---------------------------------------------------------------------------
+# ============================================================================
+# SIDEBAR
+# ============================================================================
 
 with st.sidebar:
 
@@ -273,9 +375,9 @@ with st.sidebar:
 
     servings = st.slider(
         "Servings per meal",
-        1,
-        10,
-        4,
+        min_value=1,
+        max_value=10,
+        value=4,
     )
 
     baseline_kwh = st.number_input(
@@ -284,170 +386,330 @@ with st.sidebar:
         max_value=500,
         value=45,
         help=(
-            "From your KPLC bill or token purchases. Determines your tariff "
-            "band — adding electric cooking can move you to a higher band, "
-            "which this tool accounts for."
+            "Enter your approximate household electricity use per month "
+            "excluding cooking."
         ),
     )
 
     st.divider()
 
     st.caption(
-        "Prices and tariffs are read from parameters.csv — edit that file "
-        "to update them. Fuel prices vary by locality."
+        "Prices and tariffs are read from parameters.csv. "
+        "Fuel prices can vary by location."
     )
 
 
-# ---------------------------------------------------------------------------
-# 1. COOKING CHOICES
-# ---------------------------------------------------------------------------
+# ============================================================================
+# SECTION 1
+# ============================================================================
 
-st.subheader("1. What you cook, and on what")
+st.subheader("1. Your cooking choices")
 
 st.markdown(
     """
     <div class="section-description">
-    Choose how often you prepare each dish and compare your current appliance
-    with the appliance you are considering.
+        Start by selecting the meals you cook. Then choose your current
+        appliance and the appliance you are considering.
     </div>
     """,
     unsafe_allow_html=True,
 )
 
-# Header row
-header_dish, header_current, header_proposed = st.columns(
-    [1.4, 2.0, 2.0],
+
+# ============================================================================
+# THREE HORIZONTAL CARDS
+# ============================================================================
+
+card_meals, card_current, card_considering = st.columns(
+    [1, 1, 1],
     gap="medium",
 )
 
-with header_dish:
-    st.markdown("**Dish / frequency**")
 
-with header_current:
-    st.markdown("**Current appliance**")
+# ============================================================================
+# CARD 1 — MEALS
+# ============================================================================
 
-with header_proposed:
-    st.markdown("**Considering instead**")
+with card_meals:
 
+    st.markdown(
+        """
+        <div class="choice-card choice-card-meals">
+            <div class="choice-card-title">
+                🍽️ Meals
+            </div>
+            <div class="choice-card-description">
+                Select the meals you cook and how often you cook them.
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    selected_dishes = st.multiselect(
+        "What do you cook?",
+        options=DISHES,
+        default=[],
+        placeholder="Select one or more meals",
+        key="meals_selection",
+    )
+
+    frequencies = {}
+
+    if selected_dishes:
+
+        st.markdown("**How often do you cook each meal?**")
+
+        for dish in selected_dishes:
+
+            default_label = default_frequency_label(dish)
+
+            frequencies[dish] = st.selectbox(
+                f"{dish} — frequency",
+                options=FREQUENCY_OPTIONS,
+                index=FREQUENCY_OPTIONS.index(default_label),
+                key=f"frequency_{dish}",
+            )
+
+    else:
+
+        st.info(
+            "Select one or more meals to continue."
+        )
+
+
+# ============================================================================
+# CARD 2 — CURRENT APPLIANCES
+# ============================================================================
+
+with card_current:
+
+    st.markdown(
+        """
+        <div class="choice-card choice-card-current">
+            <div class="choice-card-title">
+                🔥 Current
+            </div>
+            <div class="choice-card-description">
+                Select what you currently use for each meal.
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    current_appliances = {}
+
+    if not selected_dishes:
+
+        st.info(
+            "Your current appliances will appear here after you select meals."
+        )
+
+    else:
+
+        for dish in selected_dishes:
+
+            opts = options_for(dish)
+
+            if not opts:
+
+                st.warning(
+                    f"No tested appliance data available for {dish}."
+                )
+
+                continue
+
+            default_appliance = default_current_appliance(opts)
+
+            default_index = (
+                opts.index(default_appliance)
+                if default_appliance in opts
+                else 0
+            )
+
+            current_appliances[dish] = st.selectbox(
+                f"{dish} — current appliance",
+                options=opts,
+                index=default_index,
+                key=f"current_appliance_{dish}",
+            )
+
+
+# ============================================================================
+# CARD 3 — CONSIDERING
+# ============================================================================
+
+with card_considering:
+
+    st.markdown(
+        """
+        <div class="choice-card choice-card-considering">
+            <div class="choice-card-title">
+                ⚡ Considering
+            </div>
+            <div class="choice-card-description">
+                Select the appliance you want to compare with your current one.
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    proposed_appliances = {}
+
+    if not selected_dishes:
+
+        st.info(
+            "Your proposed appliances will appear here after you select meals."
+        )
+
+    else:
+
+        for dish in selected_dishes:
+
+            opts = options_for(dish)
+
+            if not opts:
+
+                continue
+
+            default_appliance = default_proposed_appliance(opts)
+
+            default_index = (
+                opts.index(default_appliance)
+                if default_appliance in opts
+                else 0
+            )
+
+            proposed_appliances[dish] = st.selectbox(
+                f"{dish} — considering",
+                options=opts,
+                index=default_index,
+                key=f"proposed_appliance_{dish}",
+            )
+
+
+# ============================================================================
+# BUILD MENUS
+# ============================================================================
 
 baseline_menu = []
 proposed_menu = []
 
 
-for dish in DISHES:
+for dish in selected_dishes:
 
-    opts = options_for(dish)
-
-    # Safety check in case a dish has no tested appliance
-    if not opts:
-        st.warning(
-            f"No tested appliance options are currently available for {dish}."
-        )
-        continue
-
-    # ---------------------------------------------------------------
-    # ONE CONSISTENT ROW
-    # ---------------------------------------------------------------
-
-    c0, c1, c2 = st.columns(
-        [1.4, 2.0, 2.0],
-        gap="medium",
+    frequency_label = frequencies.get(
+        dish,
+        "Not cooked",
     )
 
-    # Dish + frequency
-    with c0:
-        freq = st.number_input(
-            f"{dish} (times/week)",
-            min_value=0.0,
-            max_value=21.0,
-            value=float(DEFAULT_FREQ[dish]),
-            step=0.5,
-            key=f"f_{dish}",
+    frequency = frequency_to_number(
+        frequency_label
+    )
+
+    if frequency <= 0:
+        continue
+
+    current = current_appliances.get(dish)
+    proposed = proposed_appliances.get(dish)
+
+    if current is None or proposed is None:
+        continue
+
+    baseline_menu.append(
+        MenuItem(
+            dish,
+            current,
+            frequency,
         )
+    )
 
-    # Current appliance
-    with c1:
-
-        current_default = (
-            opts.index("LPG stove")
-            if "LPG stove" in opts
-            else 0
+    proposed_menu.append(
+        MenuItem(
+            dish,
+            proposed,
+            frequency,
         )
+    )
 
-        cur = st.selectbox(
-            f"Current {dish} appliance",
-            opts,
-            index=current_default,
-            key=f"cur_{dish}",
-        )
 
-    # Proposed appliance
-    with c2:
+# ============================================================================
+# STOP HERE IF USER HAS NOT SELECTED A MEAL
+# ============================================================================
 
-        prop_default = (
-            "EPC"
-            if "EPC" in opts
-            else (
-                "Induction cooker"
-                if "Induction cooker" in opts
-                else opts[0]
-            )
-        )
+if not selected_dishes:
 
-        prop = st.selectbox(
-            f"Proposed {dish} appliance",
-            opts,
-            index=opts.index(prop_default),
-            key=f"prop_{dish}",
-        )
+    st.divider()
 
-    # ---------------------------------------------------------------
-    # BUILD MENUS
-    # ---------------------------------------------------------------
+    st.info(
+        "👆 Select at least one meal above to see the cooking comparison."
+    )
 
-    if freq > 0:
+    st.stop()
 
-        baseline_menu.append(
-            MenuItem(dish, cur, freq)
-        )
 
-        proposed_menu.append(
-            MenuItem(dish, prop, freq)
-        )
+# ============================================================================
+# IF MEALS WERE SELECTED BUT ALL ARE NOT COOKED
+# ============================================================================
 
-# ---------------------------------------------------------------------------
-# 2. APPLIANCES TO BUY
-# ---------------------------------------------------------------------------
+if not baseline_menu:
+
+    st.divider()
+
+    st.info(
+        "Select a cooking frequency above to calculate your comparison."
+    )
+
+    st.stop()
+
+
+# ============================================================================
+# SECTION 2 — APPLIANCES TO BUY
+# ============================================================================
 
 st.subheader("2. Appliances you would need to buy")
 
 proposed_apps = sorted(
-    {m.appliance for m in proposed_menu}
+    {
+        item.appliance
+        for item in proposed_menu
+    }
 )
 
 current_apps = {
-    m.appliance for m in baseline_menu
+    item.appliance
+    for item in baseline_menu
 }
 
+default_to_buy = [
+    appliance
+    for appliance in proposed_apps
+    if appliance not in current_apps
+]
+
 to_buy = st.multiselect(
-    "Only appliances you don't already own count toward payback",
-    proposed_apps,
-    default=[
-        a for a in proposed_apps
-        if a not in current_apps
-    ],
+    "Select appliances you would need to purchase",
+    options=proposed_apps,
+    default=default_to_buy,
+    key="appliances_to_buy",
+)
+
+st.caption(
+    "Only appliances you do not already own count toward payback."
 )
 
 
-# ---------------------------------------------------------------------------
-# CALCULATE RESULTS
-# IMPORTANT: THIS MUST COME BEFORE THE RESULTS UI
-# ---------------------------------------------------------------------------
+# ============================================================================
+# CALCULATE
+# ============================================================================
 
 hh = Household(
     servings=servings,
     baseline_monthly_kwh=baseline_kwh,
 )
+
 
 out = compare(
     baseline_menu,
@@ -458,13 +720,14 @@ out = compare(
     new_appliances=tuple(to_buy),
 )
 
+
 b = out["baseline"]
 p = out["proposed"]
 
 
-# ---------------------------------------------------------------------------
-# RESULTS
-# ---------------------------------------------------------------------------
+# ============================================================================
+# SECTION 3 — RESULTS
+# ============================================================================
 
 st.divider()
 
@@ -473,16 +736,16 @@ st.subheader("3. Your cooking comparison")
 st.markdown(
     """
     <div class="section-description">
-    Here's what your current and proposed cooking choices mean for your household.
+        Here's what your selected cooking choices mean for your household.
     </div>
     """,
     unsafe_allow_html=True,
 )
 
 
-# ---------------------------------------------------------------------------
-# CALCULATED SUMMARY VALUES
-# ---------------------------------------------------------------------------
+# ============================================================================
+# CALCULATED VALUES
+# ============================================================================
 
 monthly_savings = out["monthly_savings"]
 
@@ -490,11 +753,15 @@ current_cost = b.total_cost
 proposed_cost = p.total_cost
 
 if current_cost > 0:
+
     savings_pct = (
         monthly_savings / current_cost
     ) * 100
+
 else:
+
     savings_pct = 0
+
 
 annual_savings = monthly_savings * 12
 six_month_savings = monthly_savings * 6
@@ -504,25 +771,16 @@ energy_change = (
 )
 
 
-# ---------------------------------------------------------------------------
-# MAIN RESULT
-# ---------------------------------------------------------------------------
+# ============================================================================
+# SAVINGS MESSAGE
+# ============================================================================
 
 if monthly_savings > 0:
 
-    st.markdown(
-        f"""
-        <div class="savings-banner">
-            <div class="savings-title">
-                💰 You could save {money(monthly_savings)} per month
-            </div>
-            <div class="savings-subtitle">
-                That's approximately <strong>{money(annual_savings)}</strong>
-                in savings over one year with the proposed cooking setup.
-            </div>
-        </div>
-        """,
-        unsafe_allow_html=True,
+    st.success(
+        f"💰 You could save **{money(monthly_savings)} per month** "
+        f"with the proposed cooking setup. "
+        f"That's approximately **{money(annual_savings)} per year**."
     )
 
 elif monthly_savings < 0:
@@ -530,7 +788,7 @@ elif monthly_savings < 0:
     st.warning(
         f"The proposed cooking setup costs "
         f"**{money(abs(monthly_savings))} more per month** "
-        "than your current setup."
+        f"than your current setup."
     )
 
 else:
@@ -541,13 +799,13 @@ else:
     )
 
 
-# ---------------------------------------------------------------------------
-# CURRENT VS PROPOSED
-# ---------------------------------------------------------------------------
+# ============================================================================
+# MONTHLY COST
+# ============================================================================
 
 st.markdown("### Monthly cooking cost")
 
-cost_col1, arrow_col, cost_col2 = st.columns(
+cost_col1, cost_arrow, cost_col2 = st.columns(
     [4, 1, 4]
 )
 
@@ -566,7 +824,7 @@ with cost_col1:
     )
 
 
-with arrow_col:
+with cost_arrow:
 
     st.markdown(
         """
@@ -597,9 +855,9 @@ with cost_col2:
     )
 
 
-# ---------------------------------------------------------------------------
-# VISUAL COST COMPARISON
-# ---------------------------------------------------------------------------
+# ============================================================================
+# COST PERCENTAGE
+# ============================================================================
 
 if monthly_savings > 0:
 
@@ -621,10 +879,30 @@ if monthly_savings > 0:
         unsafe_allow_html=True,
     )
 
+elif monthly_savings < 0:
 
-# ---------------------------------------------------------------------------
-# KEY INDICATORS
-# ---------------------------------------------------------------------------
+    st.markdown(
+        f"""
+        <div style="
+            text-align:center;
+            padding:12px;
+            margin:10px 0 20px 0;
+            border-radius:10px;
+            background:rgba(200,60,60,0.07);
+            font-size:1rem;
+        ">
+            <strong>{money(abs(monthly_savings))} more per month</strong>
+            &nbsp; • &nbsp;
+            {abs(savings_pct):.0f}% higher cooking cost
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+# ============================================================================
+# AT A GLANCE
+# ============================================================================
 
 st.markdown("### At a glance")
 
@@ -649,9 +927,6 @@ with k2:
     st.metric(
         "Annual impact",
         money(annual_savings),
-        help=(
-            "Monthly savings multiplied by 12 months."
-        ),
     )
 
 
@@ -659,12 +934,8 @@ with k3:
 
     st.metric(
         "Cooking electricity",
-        f"{p.cooking_kwh:.0f} kWh",
-        delta=f"{energy_change:+.0f} kWh",
-        help=(
-            "Electricity used for cooking under "
-            "the proposed setup."
-        ),
+        f"{p.cooking_kwh:.1f} kWh",
+        delta=f"{energy_change:+.1f} kWh",
     )
 
 
@@ -688,19 +959,15 @@ with k4:
 
         st.metric(
             "Payback",
-            f"{out['payback_months']} months",
-            help=(
-                f"Upfront appliance cost: "
-                f"{money(out['upfront_cost'])}"
-            ),
+            f"{out['payback_months']:.1f} months",
         )
 
 
-# ---------------------------------------------------------------------------
+# ============================================================================
 # ELECTRICITY IMPACT
-# ---------------------------------------------------------------------------
+# ============================================================================
 
-if p.cooking_kwh:
+if p.cooking_kwh > 0:
 
     st.markdown("### ⚡ Electricity impact")
 
@@ -719,7 +986,7 @@ if p.cooking_kwh:
                     Current electricity use
                 </div>
                 <div class="card-value">
-                    {baseline_kwh:.0f} kWh
+                    {baseline_kwh:.1f} kWh
                 </div>
                 <div class="card-small">
                     per month, excluding cooking
@@ -728,6 +995,7 @@ if p.cooking_kwh:
             """,
             unsafe_allow_html=True,
         )
+
 
     with tariff_col2:
 
@@ -738,7 +1006,7 @@ if p.cooking_kwh:
                     With proposed electric cooking
                 </div>
                 <div class="card-value">
-                    {total_electricity:.0f} kWh
+                    {total_electricity:.1f} kWh
                 </div>
                 <div class="card-small">
                     total household electricity per month
@@ -748,26 +1016,44 @@ if p.cooking_kwh:
             unsafe_allow_html=True,
         )
 
-    st.info(
-        f"Electric cooking adds approximately "
-        f"**{p.cooking_kwh:.0f} kWh/month**. "
-        f"Your total electricity use would be about "
-        f"**{total_electricity:.0f} kWh/month**, "
-        f"placing you in the **{p.band}** tariff band. "
-        "The tariff-band effect is already included "
-        "in the proposed cost."
+
+    # Do not assume every result object has a tariff band.
+    band = getattr(
+        p,
+        "band",
+        None,
     )
 
+    if band:
 
-# ---------------------------------------------------------------------------
+        st.info(
+            f"Electric cooking adds approximately "
+            f"**{p.cooking_kwh:.1f} kWh/month**. "
+            f"Your total electricity use would be about "
+            f"**{total_electricity:.1f} kWh/month**, "
+            f"placing you in the **{band}** tariff band."
+        )
+
+    else:
+
+        st.info(
+            f"Electric cooking adds approximately "
+            f"**{p.cooking_kwh:.1f} kWh/month**. "
+            f"Your total electricity use would be about "
+            f"**{total_electricity:.1f} kWh/month**."
+        )
+
+
+# ============================================================================
 # COOKING TIME
-# ---------------------------------------------------------------------------
+# ============================================================================
 
 st.markdown("### ⏱ Cooking time")
 
 time_col1, time_arrow, time_col2 = st.columns(
     [4, 1, 4]
 )
+
 
 with time_col1:
 
@@ -822,7 +1108,10 @@ with time_col2:
     )
 
 
-time_change = p.time_hours - b.time_hours
+time_change = (
+    p.time_hours - b.time_hours
+)
+
 
 if time_change < 0:
 
@@ -845,11 +1134,9 @@ else:
     )
 
 
-
-
-# ---------------------------------------------------------------------------
-# 12-MONTH IMPACT
-# ---------------------------------------------------------------------------
+# ============================================================================
+# LONG-TERM IMPACT
+# ============================================================================
 
 st.markdown("### 💰 What this means over time")
 
@@ -910,36 +1197,43 @@ with impact3:
     )
 
 
-
-
-# ---------------------------------------------------------------------------
+# ============================================================================
 # DETAILED BREAKDOWN
-# ---------------------------------------------------------------------------
+# ============================================================================
 
 with st.expander("🔍 View detailed cost breakdown"):
 
     detail_col1, detail_col2 = st.columns(2)
 
+
     with detail_col1:
 
         st.markdown("**Current cooking**")
 
-        st.dataframe(
-            [
-                {
-                    "Dish": e["dish"],
-                    "Appliance": e["appliance"],
-                    "KSh/month": e["monthly_cost"],
-                }
-                for e in b.items
-            ],
-            hide_index=True,
-            width="stretch",
-        )
+        current_rows = [
+            {
+                "Dish": item["dish"],
+                "Appliance": item["appliance"],
+                "KSh/month": item["monthly_cost"],
+            }
+            for item in b.items
+        ]
+
+        if current_rows:
+
+            st.dataframe(
+                current_rows,
+                hide_index=True,
+                width="stretch",
+            )
+
+        else:
+
+            st.info("No current cooking data.")
+
 
         st.caption(
-            f"Cooking time: "
-            f"**{b.time_hours:.1f} hours/month**"
+            f"Cooking time: **{b.time_hours:.1f} hours/month**"
         )
 
 
@@ -947,45 +1241,57 @@ with st.expander("🔍 View detailed cost breakdown"):
 
         st.markdown("**Proposed cooking**")
 
-        st.dataframe(
-            [
-                {
-                    "Dish": e["dish"],
-                    "Appliance": e["appliance"],
-                    "KSh/month": e["monthly_cost"],
-                }
-                for e in p.items
-            ],
-            hide_index=True,
-            width="stretch",
-        )
+        proposed_rows = [
+            {
+                "Dish": item["dish"],
+                "Appliance": item["appliance"],
+                "KSh/month": item["monthly_cost"],
+            }
+            for item in p.items
+        ]
+
+        if proposed_rows:
+
+            st.dataframe(
+                proposed_rows,
+                hide_index=True,
+                width="stretch",
+            )
+
+        else:
+
+            st.info("No proposed cooking data.")
+
 
         st.caption(
-            f"Cooking time: "
-            f"**{p.time_hours:.1f} hours/month**"
+            f"Cooking time: **{p.time_hours:.1f} hours/month**"
         )
 
 
-# ---------------------------------------------------------------------------
-# DATA CAVEATS
-# ---------------------------------------------------------------------------
+# ============================================================================
+# DATA WARNINGS
+# ============================================================================
 
-warnings = (
-    [
-        f"{d} on {a}: {why}"
-        for d, a, why
-        in b.unavailable + p.unavailable
-    ]
-    +
-    [
-        (
-            f"{e['dish']} on {e['appliance']}: "
-            f"data flagged -- {e['flag'][:90]}"
+warnings = []
+
+
+for dish, appliance, why in b.unavailable + p.unavailable:
+
+    warnings.append(
+        f"{dish} on {appliance}: {why}"
+    )
+
+
+for item in b.items + p.items:
+
+    flag = item.get("flag")
+
+    if flag:
+
+        warnings.append(
+            f"{item['dish']} on {item['appliance']}: "
+            f"data flagged — {flag[:120]}"
         )
-        for e in b.items + p.items
-        if e["flag"]
-    ]
-)
 
 
 if warnings:
@@ -999,10 +1305,9 @@ if warnings:
             st.warning(warning)
 
 
-
-# ---------------------------------------------------------------------------
+# ============================================================================
 # FOOTER
-# ---------------------------------------------------------------------------
+# ============================================================================
 
 st.divider()
 
